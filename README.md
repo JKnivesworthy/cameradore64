@@ -2,6 +2,8 @@
 
 Turn photos into a slideshow that runs on a real Commodore 64.
 
+![The Cameradore 64 interface: photos dropped in on the left, a live C64 preview of the converted image on the right, and the build button underneath](gui.png)
+
 Drop some JPGs into the page, pick a format, and out comes a file you can put
 straight onto a C64: either a `.prg` you load from disk, or a `.crt` cartridge
 image that boots the instant you switch the machine on.
