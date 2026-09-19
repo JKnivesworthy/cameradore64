@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cameradore 64 &mdash; photo slideshows for the Commodore 64</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#1b1230; --panel:#241a3d; --accent:#7c4dff; --accent2:#35c9c1;
+    --text:#eae6f7; --dim:#9d90c0; --border:#3a2a5c; --warn:#ff8a5c; --bad:#ff5c7a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height:100vh;
+  }
+  header{ padding:28px 24px 8px; text-align:center; }
+  header h1{
+    margin:0 0 4px; font-size:1.6em;
+    background:linear-gradient(90deg,#7c4dff,#35c9c1);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  header p{ margin:0; color:var(--dim); font-size:0.95em; }
+  .wrap{ max-width:1100px; margin:0 auto; padding:20px 20px 60px; }
+  .layout{ display:flex; gap:24px; flex-wrap:wrap; }
+  .col{ flex:1 1 320px; min-width:280px; }
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:18px; margin-bottom:18px;
+  }
+  .panel h2{ margin:0 0 12px; font-size:1em; color:var(--accent2); }
+  #dropzone{
+    border:2px dashed var(--border); border-radius:10px; padding:28px 16px;
+    text-align:center; cursor:pointer; transition:border-color .15s, background .15s;
+    color:var(--dim);
+  }
+  #dropzone.drag{ border-color:var(--accent); background:rgba(124,77,255,0.08); color:var(--text); }
+  #dropzone strong{ color:var(--text); }
+  #fileInput{ display:none; }
+  canvas{ display:block; image-rendering:pixelated; image-rendering:crisp-edges; background:#000; border-radius:6px; }
+  #prevWrap{ overflow:auto; text-align:center; }
+  #prevCanvas{ margin:0 auto; }
+  .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  label{ font-size:0.85em; color:var(--dim); }
+  select, input[type=range]{ background:#150e26; color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 6px; }
+  .swatches{ display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+  .tagline{ margin:-6px 0 14px; font-size:1.05em; opacity:0.7; letter-spacing:0.02em; }
+  .hint{ flex-basis:100%; font-size:0.85em; opacity:0.65; line-height:1.4; margin-top:-2px; }
+  .swatch{ width:20px; height:20px; border-radius:4px; border:2px solid transparent; cursor:pointer; }
+  .swatch.sel{ border-color:#fff; }
+  button{
+    background:var(--accent); color:#fff; border:none; border-radius:8px;
+    padding:9px 16px; font-size:0.9em; cursor:pointer; font-weight:600;
+  }
+  button:disabled{ background:#4a4160; color:#877ea3; cursor:not-allowed; }
+  button.secondary{ background:transparent; border:1px solid var(--accent); color:var(--accent); padding:5px 9px; font-size:0.8em; }
+  button.tiny{ padding:3px 8px; font-size:0.75em; border-radius:6px; }
+  button.danger{ background:transparent; border:1px solid var(--bad); color:var(--bad); }
+  #downloadBtn{ width:100%; margin-top:10px; }
+  .stat{ font-size:0.8em; color:var(--dim); margin-top:8px; line-height:1.6; }
+  .stat b{ color:var(--text); }
+  .badge{ display:inline-block; background:#150e26; border:1px solid var(--border); border-radius:5px; padding:1px 6px; font-size:0.75em; color:var(--accent2); }
+  .warnbox{ background:rgba(255,138,92,0.1); border:1px solid var(--warn); color:var(--warn); border-radius:8px; padding:8px 10px; font-size:0.8em; margin-top:8px; }
+  footer{ text-align:center; color:var(--dim); font-size:0.78em; padding:10px 20px 30px; }
+
+  #imgList{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:420px; overflow-y:auto; }
+  #imgList li{
+    display:flex; align-items:center; gap:8px; background:#150e26; border:1px solid var(--border);
+    border-radius:8px; padding:6px 8px; cursor:pointer;
+  }
+  #imgList li.active{ border-color:var(--accent); background:rgba(124,77,255,0.12); }
+  #imgList li canvas{ width:64px; height:80px; flex:none; border-radius:4px; }
+  #imgList .meta{ flex:1; min-width:0; }
+  #imgList .meta .name{ font-size:0.82em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #imgList .meta .idx{ font-size:0.72em; color:var(--dim); }
+  #imgList .btns{ display:flex; flex-direction:column; gap:3px; }
+  #capBar{ height:8px; border-radius:4px; background:#150e26; overflow:hidden; margin-top:6px; }
+  #capFill{ height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); width:0%; transition:width .2s; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cameradore 64</h1>
+  <p class="tagline">Photo slideshows for the Commodore 64</p>
+  <p>Drop several photos, get a self-running <span class="badge">.prg</span> or <span class="badge">.crt</span> slideshow you can flip through with <b>&larr;/&rarr;</b> or <b>A/D</b>, or leave running like a screensaver. Landscapes suit it best.</p>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+
+    <div class="col">
+      <div class="panel">
+        <h2>1. Images</h2>
+        <div id="dropzone">
+          <div>Drag &amp; drop JPGs/PNGs here (multiple at once is fine)<br>or <strong>click to choose files</strong></div>
+          <input type="file" id="fileInput" accept="image/*" multiple>
+        </div>
+        <ul id="imgList" style="margin-top:12px;"></ul>
+        <div class="stat" id="capStat">Add some images to get started.</div>
+        <div id="capBar"><div id="capFill"></div></div>
+        <div id="capWarn"></div>
+      </div>
+
+      <div class="panel">
+        <h2>2. Options (apply to all images)</h2>
+        <div class="row">
+          <label for="fitMode">Fit</label>
+          <select id="fitMode">
+            <option value="stretch" selected>Stretch (ignore aspect ratio)</option>
+            <option value="cover">Cover (crop to fill 160&times;200)</option>
+            <option value="contain">Contain (letterbox, keep whole image)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="ditherSel">Dithering</label>
+          <select id="ditherSel">
+            <option value="0">Off &mdash; flat colour, cleanest edges</option>
+            <option value="0.4">Light</option>
+            <option value="0.6">Medium</option>
+            <option value="0.8" selected>Full (recommended)</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="hint">Background and border are always black, so every picture is framed the same way.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>3. Output format</h2>
+        <div class="row">
+          <label><input type="radio" name="outFormat" value="crt" id="fmtCrt" checked> <b>.crt</b> &mdash; cartridge, fits far more images, loads instantly on a C64 Ultimate/Ultimate II+ or real Magic Desk cartridge</label>
+        </div>
+        <div class="row">
+          <label><input type="radio" name="outFormat" value="prg" id="fmtPrg"> <b>.prg</b> &mdash; runs on any C64, no extra hardware</label>
+        </div>
+        <div class="row">
+          <label for="autoplaySecs">Auto-advance every</label>
+          <input type="number" id="autoplaySecs" value="0" min="0" max="300" step="1" style="width:64px;">
+          <label for="autoplaySecs">seconds (0 = manual, use the keys)</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel">
+        <h2>4. C64 preview &mdash; selected image</h2>
+        <div id="prevWrap">
+          <canvas id="prevCanvas" width="320" height="200" style="width:320px;height:200px;"></canvas>
+        </div>
+        <div class="stat" id="statLine">No image selected.</div>
+      </div>
+
+      <div class="panel">
+        <h2>5. Download</h2>
+        <button id="downloadBtn" disabled>Build &amp; Download .prg</button>
+        <div class="stat" id="buildStat"></div>
+        <div class="stat" id="usageStat">
+          <code>LOAD"filename",8,1</code> then <code>RUN</code>. Use <b>&larr;/&rarr;</b> (the cursor
+          key, shifted = left) or <b>A</b>/<b>D</b> to flip pictures, <b>RUN/STOP</b> to exit.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  Runs entirely in your browser. Your photos never leave your computer: no server, no upload, no analytics.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================================
+     PART 1: image -> C64 multicolor bitmap conversion (per image)
+     ========================================================================= */
+
+  // The C64's 16 colours as RGB, in Pepto's reconstruction from PAL video
+  // measurements - the long-standing reference, and the one the familiar
+  // retro look actually comes from.
+  //
+  // A palette picker (Pepto / Colodore / VICE) briefly lived here, on the
+  // reasoning that the converter should match whatever the displaying
+  // machine is set to. Measured afterwards, that reasoning didn't hold up
+  // well enough to justify a control: switching palettes changes 27-48% of
+  // the colour indices in the file, but the preview renders with the same
+  // palette that made the decision, so the two changes cancel and nothing
+  // visible happens. Matching the display did win on error, but only
+  // narrowly, and not even reliably in the right direction - on one test
+  // photo converting with the "wrong" palette scored better. A control with
+  // a small unreliable payoff and no visible feedback is worse than no
+  // control, so it's gone.
+  const PALETTE = [
+    [0x00,0x00,0x00],[0xFF,0xFF,0xFF],[0x68,0x37,0x2B],[0x70,0xA4,0xB2],
+    [0x6F,0x3D,0x86],[0x58,0x8D,0x43],[0x35,0x28,0x79],[0xB8,0xC7,0x6F],
+    [0x6F,0x4F,0x25],[0x43,0x39,0x00],[0x9A,0x67,0x59],[0x44,0x44,0x44],
+    [0x6C,0x6C,0x6C],[0x9A,0xD2,0x84],[0x6C,0x5E,0xB5],[0x95,0x95,0x95],
+  ];
+  const CW=160, CH=200;
+
+  // ---- perceptual colour distance ----
+  // Plain RGB Euclidean distance treats a shift in blue as seriously as the
+  // same shift in green, which the eye does not, so colour choices made in
+  // RGB are visibly wrong more often than they need to be.
+  //
+  // The obvious cheap fix - compare in YIQ and weight luma above chroma -
+  // is what this used to do, and it was WORSE than RGB in a specific and
+  // very visible way. The C64's neutrals are black, dark grey (68), grey
+  // (108), light grey (149) and white (255), which leaves a huge brightness
+  // gap between light grey and white. Light green and yellow both sit right
+  // in that gap. Weighting luma 3x meant any near-white grey scored better
+  // against a colour of the same BRIGHTNESS than against a neutral of the
+  // right HUE, so greys from about 180 up mapped to yellow or light green.
+  // Whites came out tinted green, which is exactly what a user reported
+  // after looking at real output on a real screen.
+  //
+  // CIE Lab with a straight deltaE has the property that actually matters
+  // here: a neutral has a=b=0, so any chromatic candidate carries a distance
+  // penalty no amount of matching lightness can cancel out. Greys stay grey.
+  const _srgbLut = new Float32Array(256);
+  for(let i=0;i<256;i++){
+    const c=i/255;
+    _srgbLut[i] = c<=0.04045 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4);
+  }
+  function _lin(v){
+    const i = v<=0 ? 0 : (v>=255 ? 255 : Math.round(v));
+    return _srgbLut[i];
+  }
+  function _f(t){ return t>0.008856451679 ? Math.cbrt(t) : (7.787037*t + 0.137931034); }
+  function rgbToLab(r,g,b){
+    const R=_lin(r), G=_lin(g), B=_lin(b);
+    const X=(R*0.4124564 + G*0.3575761 + B*0.1804375)/0.95047;
+    const Y=(R*0.2126729 + G*0.7151522 + B*0.0721750);
+    const Z=(R*0.0193339 + G*0.1191920 + B*0.9503041)/1.08883;
+    const fx=_f(X), fy=_f(Y), fz=_f(Z);
+    return [116*fy-16, 500*(fx-fy), 200*(fy-fz)];
+  }
+  const PAL_LAB = PALETTE.map(c => rgbToLab(c[0],c[1],c[2]));
+  function labDist(l1,a1,b1, l2,a2,b2){
+    const dl=l1-l2, da=a1-a2, db=b1-b2;
+    return dl*dl + da*da + db*db;
+  }
+  function nearestIdx(r,g,b){
+    const lab=rgbToLab(r,g,b);
+    let best=0,bestD=Infinity;
+    for(let k=0;k<16;k++){
+      const c=PAL_LAB[k];
+      const d=labDist(lab[0],lab[1],lab[2],c[0],c[1],c[2]);
+      if(d<bestD){bestD=d;best=k;}
+    }
+    return best;
+  }
+
+  function clamp(v){ return v<0?0:(v>255?255:v); }
+  function diffuse(buf,x,y,er,eg,eb,frac,w,h){
+    if(x<0||x>=w||y<0||y>=h) return;
+    const p=(y*w+x)*3;
+    buf[p]  =clamp(buf[p]  +er*frac);
+    buf[p+1]=clamp(buf[p+1]+eg*frac);
+    buf[p+2]=clamp(buf[p+2]+eb*frac);
+  }
+
+  function sampleToBuffer(img, fitMode){
+    const off=document.createElement('canvas');
+    off.width=CW; off.height=CH;
+    const ctx=off.getContext('2d');
+    const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+    const targetAR=CW/CH, srcAR=iw/ih;
+    if(fitMode==='stretch'){
+      ctx.drawImage(img,0,0,iw,ih,0,0,CW,CH);
+    } else if(fitMode==='contain'){
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,CW,CH);
+      let dw,dh;
+      if(srcAR>targetAR){ dw=CW; dh=CW/srcAR; } else { dh=CH; dw=CH*srcAR; }
+      ctx.drawImage(img,0,0,iw,ih,(CW-dw)/2,(CH-dh)/2,dw,dh);
+    } else {
+      let sw,sh,sx,sy;
+      if(srcAR>targetAR){ sh=ih; sw=ih*targetAR; sy=0; sx=(iw-sw)/2; }
+      else { sw=iw; sh=iw/targetAR; sx=0; sy=(ih-sh)/2; }
+      ctx.drawImage(img,sx,sy,sw,sh,0,0,CW,CH);
+    }
+    return ctx.getImageData(0,0,CW,CH);
+  }
+
+  // ---- the colour-allocation problem, stated plainly ----
+  // Multicolor bitmap mode gives each 4x8 cell four colours: one background
+  // shared by the whole screen, plus three chosen per cell. So converting an
+  // image is really two nested choices - one global background, and 1000
+  // independent triples - and the quality of the result is almost entirely
+  // decided by how well those are picked.
+  //
+  // The first version of this picked them by counting votes: quantize every
+  // pixel to its nearest palette entry, then take the three most popular
+  // per cell. That is fast and noticeably worse than it needs to be, because
+  // popularity is not the same as usefulness. A cell containing a smooth
+  // gradient votes for three neighbouring colours that between them
+  // represent it barely better than one would, while a different triple that
+  // brackets the range would reproduce it far more closely. Voting also
+  // can't see that a colour only *narrowly* lost - it just drops it.
+  //
+  // This version instead measures. For every cell it evaluates all 455
+  // possible triples against the actual pixels and keeps the one with the
+  // lowest total error. That is affordable because the distance from each
+  // pixel to each of the 16 palette entries is computed once up front, so
+  // every candidate is a sum over a precomputed table rather than a fresh
+  // round of colour maths.
+  const CELLS_X=CW/4, CELLS_Y=CH/8, CELL_PX=32, NCELLS=CELLS_X*CELLS_Y;
+
+  function buildDistanceTable(buf){
+    const D=new Float32Array(NCELLS*CELL_PX*16);
+    const L=new Float32Array(NCELLS*CELL_PX*3);   // each pixel's Lab, kept for tie-breaking
+    for(let cy=0;cy<CELLS_Y;cy++) for(let cx=0;cx<CELLS_X;cx++){
+      const cell=cy*CELLS_X+cx, base=cell*CELL_PX*16, lbase=cell*CELL_PX*3;
+      for(let py=0;py<8;py++) for(let px=0;px<4;px++){
+        const p=(((cy*8+py)*CW)+(cx*4+px))*3;
+        const lab=rgbToLab(buf[p],buf[p+1],buf[p+2]);
+        const idx=py*4+px, o=base+idx*16, lo=lbase+idx*3;
+        L[lo]=lab[0]; L[lo+1]=lab[1]; L[lo+2]=lab[2];
+        for(let k=0;k<16;k++){
+          const c=PAL_LAB[k];
+          D[o+k]=labDist(lab[0],lab[1],lab[2],c[0],c[1],c[2]);
+        }
+      }
+    }
+    return {D,L};
+  }
+
+  // Midpoint of every pair of palette colours, in Lab. Dithering between two
+  // colours is, to the eye, roughly their average - so these are the extra
+  // "colours" a dithered cell can actually produce.
+  let PAL_MID = null;
+  function buildMidpoints(){
+    PAL_MID=new Float32Array(16*16*3);
+    for(let a=0;a<16;a++) for(let b=0;b<16;b++){
+      const o=(a*16+b)*3;
+      PAL_MID[o]  =(PAL_LAB[a][0]+PAL_LAB[b][0])/2;
+      PAL_MID[o+1]=(PAL_LAB[a][1]+PAL_LAB[b][1])/2;
+      PAL_MID[o+2]=(PAL_LAB[a][2]+PAL_LAB[b][2])/2;
+    }
+  }
+
+  const _scratch=new Float32Array(CELL_PX);
+
+  // Exhaustive: every triple, exactly scored. Structured so the partial
+  // minimum for c1 is reused across all c2, and for (c1,c2) across all c3,
+  // which turns 455 independent 32-pixel scans into roughly one.
+  const _m1=new Float32Array(CELL_PX), _m2=new Float32Array(CELL_PX);
+  const TIE_EPS=1e-6;
+
+  // Score a candidate set of four colours the way a DITHERED cell actually
+  // behaves: each pixel can land on one of the four, or on the visual
+  // average of any two of them. Only used to break ties, and ties are the
+  // case that needs it. A flat cell is fully described by one colour, so its
+  // other two slots are free and every triple containing the right colour
+  // scores identically on the plain metric. Which tied triple you keep still
+  // matters enormously, because those "free" slots are live options the
+  // dithering pass will reach for:
+  //   - taking whichever tied triple came first filled them with
+  //     low-numbered colours, and a flat grey could come out speckled red
+  //   - filling them with near-duplicates of the best colour fixed that but
+  //     left dithering nothing to blend, which cost more than it saved
+  // Scoring by what a dither can reach picks bracketing pairs instead: for a
+  // flat grey sitting between light grey and white, it keeps both.
+  const _quad=new Int32Array(4);
+  function ditherAwareScore(L,lbase,c0,c1,c2,c3){
+    _quad[0]=c0; _quad[1]=c1; _quad[2]=c2; _quad[3]=c3;
+    let total=0;
+    for(let p=0;p<CELL_PX;p++){
+      const lo=lbase+p*3, pl=L[lo], pa=L[lo+1], pb=L[lo+2];
+      let best=Infinity;
+      for(let i=0;i<4;i++){
+        for(let j=i;j<4;j++){
+          const o=(_quad[i]*16+_quad[j])*3;
+          const dl=pl-PAL_MID[o], da=pa-PAL_MID[o+1], db=pb-PAL_MID[o+2];
+          const d=dl*dl+da*da+db*db;
+          if(d<best) best=d;
+        }
+      }
+      total+=best;
+    }
+    return total;
+  }
+
+  // `tieBreak` is skipped entirely when dithering is off: without error
+  // diffusion a pixel's value never drifts, so a spare colour that is far
+  // from everything in the cell can never win the nearest-colour test and
+  // which tied triple was kept makes no difference to the output.
+  function bestTripleForCell(D,L,cellBase,lbase,bg,tieBreak){
+    const base=_scratch;
+    for(let p=0;p<CELL_PX;p++) base[p]=D[cellBase+p*16+bg];
+
+    let bestErr=Infinity, bestSpare=Infinity, b1=0,b2=0,b3=0;
+    for(let c1=0;c1<16;c1++){
+      if(c1===bg) continue;
+      for(let p=0;p<CELL_PX;p++){ const d=D[cellBase+p*16+c1]; _m1[p]=d<base[p]?d:base[p]; }
+      for(let c2=c1+1;c2<16;c2++){
+        if(c2===bg) continue;
+        for(let p=0;p<CELL_PX;p++){ const d=D[cellBase+p*16+c2]; _m2[p]=d<_m1[p]?d:_m1[p]; }
+        for(let c3=c2+1;c3<16;c3++){
+          if(c3===bg) continue;
+          let sum=0;
+          for(let p=0;p<CELL_PX;p++){
+            const d=D[cellBase+p*16+c3];
+            sum += d<_m2[p]?d:_m2[p];
+          }
+          if(sum<bestErr-TIE_EPS){
+            bestErr=sum; b1=c1; b2=c2; b3=c3;
+            bestSpare = tieBreak ? ditherAwareScore(L,lbase,bg,c1,c2,c3) : 0;
+          } else if(tieBreak && sum<bestErr+TIE_EPS){
+            const spare=ditherAwareScore(L,lbase,bg,c1,c2,c3);
+            if(spare<bestSpare){ bestErr=sum; bestSpare=spare; b1=c1; b2=c2; b3=c3; }
+          }
+        }
+      }
+    }
+    return [b1,b2,b3];
+  }
+
+  // Pure: takes a Float32 RGB buffer, returns the C64 memory layout. Kept
+  // free of any canvas/DOM dependency so the conversion can be exercised
+  // headlessly, without a browser.
+  function convertPixels(buf, opts){
+    opts=opts||{};
+    buildMidpoints();
+    const {D,L}=buildDistanceTable(buf);
+
+    // The screen-wide background colour, and with it the border, since the
+    // driver sets $D020 and $D021 together. Always black: it frames the
+    // picture cleanly instead of putting a bright band around it, and it
+    // stays the same from one slide to the next rather than flashing a new
+    // border colour on every image.
+    //
+    // This used to search all 16 candidates for the lowest total error. The
+    // search is gone rather than merely overridden, because measuring it
+    // showed there was nothing to give up - it already chose black on five
+    // of six test images, and on the sixth (a real photo, where it chose
+    // dark grey) black scored 3.5% BETTER, the approximation having picked
+    // slightly wrong. Dropping it costs no quality and takes a large bite
+    // out of conversion time.
+    const bg=0;
+
+    // How much of each pixel's leftover error to push into its neighbours.
+    // 0 disables dithering entirely. The default was picked by measurement,
+    // not taste: a sweep compared each strength against the original
+    // through a blur that models the eye integrating adjacent
+    // pixels (and the C64's 2:1 pixel aspect, so horizontal patterns aren't
+    // flattered). 0.8 won on nearly every test image, including two of the
+    // user's own photos. Full strength (1.0) is measurably worse - the error
+    // has nowhere to go inside a 4-pixel-wide cell whose three colours may
+    // not bracket it, so it accumulates into crawling artefacts instead of
+    // averaging out. It stays adjustable because how much texture is too
+    // much is partly a matter of taste and of the picture.
+    const strength=(opts.ditherStrength!==undefined)
+      ? +opts.ditherStrength
+      : (opts.dither===false ? 0 : DITHER_STRENGTH);
+
+    const cellPalette=new Array(NCELLS);
+    for(let cell=0;cell<NCELLS;cell++)
+      cellPalette[cell]=bestTripleForCell(D,L,cell*CELL_PX*16,cell*CELL_PX*3,bg,strength>0);
+
+    // Assign each pixel to one of its cell's four colours, optionally
+    // diffusing the leftover error into neighbours. The palettes above were
+    // chosen from the undithered image on purpose - dithering trades colour
+    // accuracy for apparent resolution, and letting it feed back into the
+    // palette choice makes both worse.
+    const codes=new Uint8Array(CW*CH);
+    // (strength is resolved above, before the cell palettes are chosen)
+    const doDither=strength>0;
+    for(let y=0;y<CH;y++){
+      for(let x=0;x<CW;x++){
+        const cx=(x/4)|0, cy=(y/8)|0;
+        const pal=cellPalette[cy*CELLS_X+cx];
+        const colIdx=[bg,pal[0],pal[1],pal[2]];
+        const p=(y*CW+x)*3;
+        const r=buf[p], g=buf[p+1], b=buf[p+2];
+        const lab=rgbToLab(r,g,b);
+        let best=0,bestD=Infinity;
+        for(let k=0;k<4;k++){
+          const c=PAL_LAB[colIdx[k]];
+          const d=labDist(lab[0],lab[1],lab[2],c[0],c[1],c[2]);
+          if(d<bestD){bestD=d;best=k;}
+        }
+        codes[y*CW+x]=best;
+        if(doDither){
+          const chosen=PALETTE[colIdx[best]];
+          // Damped Floyd-Steinberg. At full strength the error has nowhere
+          // to go inside a 4-pixel-wide cell whose three colours may not
+          // bracket it, and it accumulates into crawling "worm" artefacts
+          // instead of averaging out. Backing the feedback off keeps the
+          // texture without the crawl.
+          const er=(r-chosen[0])*strength;
+          const eg=(g-chosen[1])*strength;
+          const eb=(b-chosen[2])*strength;
+          diffuse(buf,x+1,y,  er,eg,eb,7/16,CW,CH);
+          diffuse(buf,x-1,y+1,er,eg,eb,3/16,CW,CH);
+          diffuse(buf,x,  y+1,er,eg,eb,5/16,CW,CH);
+          diffuse(buf,x+1,y+1,er,eg,eb,1/16,CW,CH);
+        }
+      }
+    }
+
+    const bitmap=new Uint8Array(8000);
+    const screen=new Uint8Array(1000);
+    const color=new Uint8Array(1000);
+    for(let cy=0;cy<CELLS_Y;cy++){
+      for(let cx=0;cx<CELLS_X;cx++){
+        const cellIdx=cy*CELLS_X+cx;
+        const pal=cellPalette[cellIdx];
+        screen[cellIdx]=((pal[0]&0x0F)<<4)|(pal[1]&0x0F);
+        color[cellIdx]=pal[2]&0x0F;
+        for(let row=0;row<8;row++){
+          let byte=0;
+          for(let col=0;col<4;col++){
+            const x=cx*4+col, y=cy*8+row;
+            byte |= (codes[y*CW+x]&0x03) << ((3-col)*2);
+          }
+          bitmap[cellIdx*8+row]=byte;
+        }
+      }
+    }
+
+    return {bitmap,screen,color,bg,codes,cellPalette};
+  }
+  const DITHER_STRENGTH=0.8;   // default; see convertPixels()
+
+  // Convert one image to {bitmap(8000),screen(1000),color(1000),bg,renderTo}
+  function convertOne(img, opts){
+    const imgData=sampleToBuffer(img, opts.fitMode);
+    const src=imgData.data;
+    const npx=CW*CH;
+    const buf=new Float32Array(npx*3);
+    for(let i=0;i<npx;i++){ buf[i*3]=src[i*4]; buf[i*3+1]=src[i*4+1]; buf[i*3+2]=src[i*4+2]; }
+
+    const out=convertPixels(buf, opts);
+    const {bitmap,screen,color,bg,codes,cellPalette}=out;
+
+    function renderTo(canvas){
+      canvas.width=320; canvas.height=200;
+      const pctx=canvas.getContext('2d');
+      const pimg=pctx.createImageData(320,200);
+      for(let y=0;y<CH;y++){
+        for(let x=0;x<CW;x++){
+          const cx=(x/4)|0, cy=(y/8)|0;
+          const pal=cellPalette[cy*CELLS_X+cx];
+          const colIdx=[bg,pal[0],pal[1],pal[2]];
+          const c=PALETTE[colIdx[codes[y*CW+x]]];
+          for(let dx=0;dx<2;dx++){
+            const px=(y*320+(x*2+dx))*4;
+            pimg.data[px]=c[0]; pimg.data[px+1]=c[1]; pimg.data[px+2]=c[2]; pimg.data[px+3]=255;
+          }
+        }
+      }
+      pctx.putImageData(pimg,0,0);
+    }
+
+    return {bitmap,screen,color,bg,renderTo};
+  }
+
+  /* =========================================================================
+     PART 2: tiny two-pass 6502 assembler (fixed instruction set)
+     ========================================================================= */
+
+  // Minimal two-pass 6502 "assembler" for a fixed, small instruction set.
+  // Lines are simple strings. Supports labels, a constants dict, and just the
+  // addressing modes this program needs.
+
+  function assemble(lines, org, consts) {
+    consts = consts || {};
+
+    // ---- opcode table: key = "MNEM:MODE" -> {op, len} ----
+    const OPS = {
+      'SEI:impl':  {op:0x78, len:1},
+      'CLC:impl':  {op:0x18, len:1},
+      'SEC:impl':  {op:0x38, len:1},
+      'INX:impl':  {op:0xE8, len:1},
+      'INY:impl':  {op:0xC8, len:1},
+      'DEX:impl':  {op:0xCA, len:1},
+      'DEY:impl':  {op:0x88, len:1},
+      'RTS:impl':  {op:0x60, len:1},
+      'TAY:impl':  {op:0xA8, len:1},
+      'TAX:impl':  {op:0xAA, len:1},
+      'ASL:impl':  {op:0x0A, len:1},
+
+      'LDA:imm':   {op:0xA9, len:2},
+      'LDA:zp':    {op:0xA5, len:2},
+      'LDA:abs':   {op:0xAD, len:3},
+      'LDA:absy':  {op:0xB9, len:3},
+      'LDA:indy':  {op:0xB1, len:2},
+
+      'STA:zp':    {op:0x85, len:2},
+      'STA:abs':   {op:0x8D, len:3},
+      'STA:indy':  {op:0x91, len:2},
+
+      'AND:imm':   {op:0x29, len:2},
+      'ORA:imm':   {op:0x09, len:2},
+      'ADC:imm':   {op:0x69, len:2},
+      'SBC:imm':   {op:0xE9, len:2},
+      'CMP:imm':   {op:0xC9, len:2},
+
+      'INC:zp':    {op:0xE6, len:2},
+      'DEC:zp':    {op:0xC6, len:2},
+      'LDX:imm':   {op:0xA2, len:2},
+      'LDY:imm':   {op:0xA0, len:2},
+      'LDY:zp':    {op:0xA4, len:2},
+
+      'JMP:abs':   {op:0x4C, len:3},
+      'JSR:abs':   {op:0x20, len:3},
+
+      'BEQ:rel':   {op:0xF0, len:2},
+      'BNE:rel':   {op:0xD0, len:2},
+    };
+
+    function resolveConst(tok) {
+      if (tok in consts) return consts[tok];
+      if (/^\$[0-9A-Fa-f]+$/.test(tok)) return parseInt(tok.slice(1), 16);
+      if (/^-?\d+$/.test(tok)) return parseInt(tok, 10);
+      throw new Error('cannot resolve constant: ' + tok);
+    }
+
+    function parseLine(raw) {
+      let line = raw.replace(/;.*$/, '').trim();
+      if (!line) return null;
+      if (line.endsWith(':')) return {label: line.slice(0, -1)};
+      const sp = line.indexOf(' ');
+      const mnem = (sp === -1 ? line : line.slice(0, sp)).toUpperCase();
+      const rest = (sp === -1 ? '' : line.slice(sp + 1)).trim();
+      return {mnem, operand: rest};
+    }
+
+    function classify(mnem, operand, labels) {
+      if (operand === '') return {mode: 'impl'};
+      if (operand.startsWith('#')) {
+        let o = operand.slice(1);
+        let val;
+        if (o.startsWith('<')) { val = null; return {mode:'imm', lo: o.slice(1)}; }
+        if (o.startsWith('>')) { val = null; return {mode:'imm', hi: o.slice(1)}; }
+        return {mode: 'imm', val: o};
+      }
+      if (operand.startsWith('z$')) {
+        return {mode: 'zp', val: '$' + operand.slice(2)};
+      }
+      { const m = operand.match(/^\(z\$([0-9A-Fa-f]{1,2})\),Y$/);
+        if (m) return {mode: 'indy', val: '$' + m[1]}; }
+      if (operand.endsWith(',Y')) {
+        return {mode: 'absy', val: operand.slice(0, -2)};
+      }
+      if (operand.startsWith('$')) {
+        return {mode: 'abs', val: operand};
+      }
+      // bare label, or label+N (branch/jmp/jsr/abs target)
+      return {mode: 'label', val: operand};
+    }
+
+    // ---- pass 1: compute addresses ----
+    const labels = {};
+    let addr = org;
+    const parsed = [];
+    for (const raw of lines) {
+      const p = parseLine(raw);
+      if (!p) continue;
+      if (p.label) {
+        labels[p.label] = addr;
+        parsed.push(p);
+        continue;
+      }
+      if (p.mnem === 'SPACE') {
+        // pseudo-op: reserve N bytes (filled in later by the caller), no opcode emitted.
+        p.isSpace = true;
+        p.addr = addr;
+        p.spaceLen = parseInt(p.operand, 10);
+        addr += p.spaceLen;
+        parsed.push(p);
+        continue;
+      }
+      if (p.mnem === 'WORD') {
+        // pseudo-op: emit the 2-byte (lo,hi) address of a label or constant.
+        // Resolved in pass 2 so forward references (e.g. a label defined
+        // later in the same listing) work.
+        p.isWord = true;
+        p.addr = addr;
+        addr += 2;
+        parsed.push(p);
+        continue;
+      }
+      if (p.mnem === 'BYTES') {
+        // pseudo-op: emit a literal comma-separated list of byte constants.
+        p.isBytes = true;
+        p.addr = addr;
+        p.byteList = p.operand.split(',').map(s => s.trim());
+        addr += p.byteList.length;
+        parsed.push(p);
+        continue;
+      }
+      const cls = classify(p.mnem, p.operand);
+      let modeKey = cls.mode;
+      if (modeKey === 'label') {
+        // branch or jmp/jsr to a label -> resolved mode depends on mnemonic
+        modeKey = (p.mnem === 'JMP' || p.mnem === 'JSR') ? 'abs' : 'rel';
+      }
+      const key = p.mnem + ':' + modeKey;
+      const info = OPS[key];
+      if (!info) throw new Error('unknown instruction ' + key + ' (' + raw + ')');
+      p.cls = cls;
+      p.modeKey = modeKey;
+      p.info = info;
+      p.addr = addr;
+      addr += info.len;
+      parsed.push(p);
+    }
+    const endAddr = addr;
+
+    // ---- pass 2: emit bytes ----
+    const out = new Uint8Array(endAddr - org);
+    function setByte(a, v) {
+      if (v < 0 || v > 255) throw new Error('byte out of range: ' + v + ' at $' + a.toString(16));
+      out[a - org] = v & 0xFF;
+    }
+    function resolveOperandValue(tok) {
+      const plus = tok.indexOf('+');
+      if (plus > 0) {
+        const base = tok.slice(0, plus);
+        const off = parseInt(tok.slice(plus + 1), 10);
+        const baseVal = (base in labels) ? labels[base] : resolveConst(base);
+        return baseVal + off;
+      }
+      if (tok in labels) return labels[tok];
+      return resolveConst(tok);
+    }
+
+    for (const p of parsed) {
+      if (p.label) continue;
+      if (p.isSpace) continue; // left as zero; caller fills it in via labels[]
+      if (p.isWord) {
+        const val = resolveOperandValue(p.operand.trim());
+        setByte(p.addr, val & 0xFF);
+        setByte(p.addr + 1, (val >> 8) & 0xFF);
+        continue;
+      }
+      if (p.isBytes) {
+        for (let i = 0; i < p.byteList.length; i++) {
+          setByte(p.addr + i, resolveOperandValue(p.byteList[i]) & 0xFF);
+        }
+        continue;
+      }
+      setByte(p.addr, p.info.op);
+      if (p.info.len === 1) continue;
+      if (p.modeKey === 'rel') {
+        const target = resolveOperandValue(p.cls.val);
+        const off = target - (p.addr + 2);
+        if (off < -128 || off > 127) throw new Error('branch out of range at $' + p.addr.toString(16) + ' -> $' + target.toString(16));
+        setByte(p.addr + 1, off & 0xFF);
+        continue;
+      }
+      if (p.modeKey === 'abs' || p.modeKey === 'absy') {
+        const val = resolveOperandValue(p.cls.val);
+        setByte(p.addr + 1, val & 0xFF);
+        setByte(p.addr + 2, (val >> 8) & 0xFF);
+        continue;
+      }
+      if (p.modeKey === 'zp' || (p.modeKey === 'indy')) {
+        const val = resolveOperandValue(p.cls.val);
+        setByte(p.addr + 1, val & 0xFF);
+        continue;
+      }
+      if (p.modeKey === 'imm') {
+        if (p.cls.lo !== undefined) {
+          const val = resolveOperandValue(p.cls.lo);
+          setByte(p.addr + 1, val & 0xFF);
+        } else if (p.cls.hi !== undefined) {
+          const val = resolveOperandValue(p.cls.hi);
+          setByte(p.addr + 1, (val >> 8) & 0xFF);
+        } else {
+          const val = resolveOperandValue(p.cls.val);
+          setByte(p.addr + 1, val & 0xFF);
+        }
+        continue;
+      }
+      throw new Error('unhandled mode ' + p.modeKey);
+    }
+
+    return {bytes: out, labels, endAddr};
+  }
+
+  /* =========================================================================
+     PART 3: the slideshow driver program - shared by both output formats
+     ========================================================================= */
+
+  // DELAY_OUTER_COUNT tunes the pause after each GROUP_SIZE-page group during
+  // the "falling" reveal. GROUP_SIZE pages are copied back-to-back (no pause
+  // between them), then one longer pause -> a chunky, blocky step-reveal
+  // instead of a fine per-page sweep. With GROUP_SIZE=4, a full image switch
+  // (32 bitmap pages + 4 screen pages + 4 color pages = 10 groups) does 10
+  // pauses; DELAY_OUTER_COUNT=~233 -> ~300ms/pause -> ~3s total.
+  const GROUP_SIZE = 4;
+  const DELAY_OUTER_COUNT = 233;
+  const CODE_START = 0x080E;
+
+  // Assumed frame rate for the autoplay timer. There's no IRQ running (we SEI
+  // at boot and never CLI, so the KERNAL jiffy clock never ticks), so timing
+  // is derived by polling the VIC raster register once per MAINLOOP pass. A
+  // real C64 is 50Hz (PAL) or 60Hz (NTSC) depending on region; we assume 50,
+  // so autoplay timing is approximate (+/-~20%) on NTSC machines.
+  const FRAMERATE = 50;
+
+  // Shared driver body: MAINLOOP, key handling, SHOWIMG/COPYPAGES/DELAY, the
+  // autoplay timer, and the data tables. Used by both the PRG and (later) CRT
+  // builders so the actual slideshow logic only has to be right in one place.
+  // `hooks` lets a caller splice in format-specific bits without duplicating
+  // the rest:
+  //   bankSelectLines(srcBankExpr) -> lines to run right before a chunk's
+  //     copy begins, or null if the format has no bank switching (PRG).
+  //   chunkBytesPerEntry -> 5 for PRG (srcLo,srcHi,dstLo,dstHi,pages), 6 for
+  //     CRT (bank,srcLo,srcHi,dstLo,dstHi,pages).
+  function buildDriverLines(NUMIMAGES, opts, hooks) {
+    const LASTIDX = NUMIMAGES - 1;
+    const autoplaySeconds = opts.autoplaySeconds || 0;
+    const AUTOTARGET = Math.max(1, Math.round(autoplaySeconds * FRAMERATE));
+    const entryLen = hooks.chunkBytesPerEntry;
+    // offsets within one chunk-descriptor entry
+    const off = hooks.chunkBytesPerEntry === 6
+      ? { bank: 0, srcLo: 1, srcHi: 2, dstLo: 3, dstHi: 4, pages: 5 }
+      : { srcLo: 0, srcHi: 1, dstLo: 2, dstHi: 3, pages: 4 };
+
+    const lines = [];
+    const push = (...l) => lines.push(...l);
+
+    push('MAINLOOP:');
+    push('JSR WAITFRAME');
+
+    if (autoplaySeconds > 0) {
+      push(
+        'LDA z$F1', 'BNE AUTO_DEC_LO', 'DEC z$F2',
+        'AUTO_DEC_LO:', 'DEC z$F1',
+        'LDA z$F1', 'BNE AUTO_CONT',
+        'LDA z$F2', 'BNE AUTO_CONT',
+        'JMP DO_NEXT',
+        'AUTO_CONT:'
+      );
+    }
+
+    // Keyboard scan. Each key lives at a specific (column, row) in the C64
+    // matrix: the CPU drives one column low via $DC00 and reads the rows
+    // back from $DC01, and a key only shows up while its OWN column is
+    // driven. An earlier version read a single column ($FB) and treated
+    // bits 0/1/2 as CRSR/A/D. Only D is really there - bit 1 of that column
+    // is 'R' and bit 0 is '5' - so on real hardware D worked and A and the
+    // cursor keys did nothing at all, exactly as a user reported. The
+    // positions below are the real ones, taken from the actual C64 matrix.
+    push(
+      // RUN/STOP: column 7, row 7.
+      'LDA #$7F', 'STA $DC00', 'LDA $DC01', 'AND #$80', 'BEQ DOEXIT',
+
+      // Either shift held? The cursor keys need it to tell forward from
+      // back. LSHIFT is column 1 row 7, RSHIFT is column 6 row 4 -
+      // different columns, so two separate reads.
+      'LDA #$00', 'STA z$F7',
+      'LDA #$FD', 'STA $DC00', 'LDA $DC01', 'AND #$80', 'BEQ SHIFT_ON',
+      'LDA #$BF', 'STA $DC00', 'LDA $DC01', 'AND #$10', 'BNE SHIFT_OFF',
+      'SHIFT_ON:', 'LDA #$01', 'STA z$F7',
+      'SHIFT_OFF:',
+
+      // D: column 2, row 2 -> next.
+      'LDA #$FB', 'STA $DC00', 'LDA $DC01', 'AND #$04', 'BEQ DO_NEXT',
+      // A: column 1, row 2 -> previous.
+      'LDA #$FD', 'STA $DC00', 'LDA $DC01', 'AND #$04', 'BEQ DO_PREV',
+      // Cursor left/right (column 0, row 2) and up/down (column 0, row 7).
+      // Both are one physical two-way key on a C64, so unshifted goes
+      // forward and shifted goes back, as they do in BASIC.
+      'LDA #$FE', 'STA $DC00', 'LDA $DC01', 'STA z$F8',
+      'LDA z$F8', 'AND #$04', 'BEQ CRSR_HIT',
+      'LDA z$F8', 'AND #$80', 'BNE NOKEY',
+      'CRSR_HIT:', 'LDA z$F7', 'BNE DO_PREV',
+      'JMP DO_NEXT',
+      'NOKEY:', 'JMP MAINLOOP',
+
+      'WAITFRAME:',
+      'WF1:', 'LDA $D012', 'CMP #$C0', 'BEQ WF1',
+      'WF2:', 'LDA $D012', 'CMP #$C0', 'BNE WF2',
+      'RTS',
+    );
+
+    push('DOEXIT:');
+    push(...hooks.exitLines);
+
+    push(
+      'DO_NEXT:', 'LDA z$F9', 'CMP #LASTIDX', 'BNE NEXT_OK', 'LDA #$FF',
+      'NEXT_OK:', 'CLC', 'ADC #$01', 'STA z$F9', 'JSR SHOWIMG', 'JSR WAITRELEASE',
+    );
+    if (autoplaySeconds > 0) push('LDA #<AUTOTARGET', 'STA z$F1', 'LDA #>AUTOTARGET', 'STA z$F2');
+    push('JMP MAINLOOP');
+
+    push(
+      'DO_PREV:', 'LDA z$F9', 'BNE PREV_OK', 'LDA #NUMIMAGES',
+      'PREV_OK:', 'SEC', 'SBC #$01', 'STA z$F9', 'JSR SHOWIMG', 'JSR WAITRELEASE',
+    );
+    if (autoplaySeconds > 0) push('LDA #<AUTOTARGET', 'STA z$F1', 'LDA #>AUTOTARGET', 'STA z$F2');
+    push('JMP MAINLOOP');
+
+    // Hold here until every navigation key is released, so one press
+    // advances one image. Each key has to be checked in its own column -
+    // the old version polled three bits of a single column, which meant it
+    // was really only ever waiting on D.
+    push(
+      'WAITRELEASE:',
+      'LDA #$FB', 'STA $DC00', 'LDA $DC01', 'AND #$04', 'BEQ WAITRELEASE',   // D
+      'LDA #$FD', 'STA $DC00', 'LDA $DC01', 'AND #$04', 'BEQ WAITRELEASE',   // A
+      'LDA #$FE', 'STA $DC00', 'LDA $DC01', 'AND #$84', 'CMP #$84', 'BNE WAITRELEASE',  // cursor keys
+      'RTS',
+    );
+
+    // Data-driven. IMGCHUNKS[idx] -> list of chunk-descriptor entries
+    // (entryLen bytes each): pages=0 ends the list; pages=$FF is a MARKER
+    // meaning "set the background color now" (not a copy). Chunk lists are
+    // built as [screen..., color(straight to $D800)..., MARKER, bitmap...]
+    // so the palette/background settle first (fast) and the bitmap shape
+    // sweeps in last, in grouped blocky steps -> a "falling into place" look.
+    push(
+      'SHOWIMG:', 'LDA z$F9', 'ASL', 'TAY',
+      'LDA IMGCHUNKS,Y', 'STA z$F5', 'LDA IMGCHUNKS+1,Y', 'STA z$F6',
+      'LDA #GROUP_SIZE', 'STA z$F0',   // pages remaining until next pause (persists across chunks)
+
+      'CHUNKLOOP:',
+      'LDY #' + off.pages, 'LDA (z$F5),Y', 'BEQ SHOWIMG_DONE',
+      'CMP #$FF', 'BEQ DO_MARKER',
+      'TAX',
+    );
+    if (hooks.bankSelectLines) push(...hooks.bankSelectLines());
+    push(
+      'LDY #' + off.srcLo, 'LDA (z$F5),Y', 'STA z$FB',
+      'LDY #' + off.srcHi, 'LDA (z$F5),Y', 'STA z$FC',
+      'LDY #' + off.dstLo, 'LDA (z$F5),Y', 'STA z$FD',
+      'LDY #' + off.dstHi, 'LDA (z$F5),Y', 'STA z$FE',
+      'JSR COPYPAGES',
+      'JMP ADVANCE_CHUNK',
+
+      'DO_MARKER:',
+      'LDY z$F9', 'LDA IMGBG,Y', 'STA $D020', 'STA $D021',
+
+      'ADVANCE_CHUNK:',
+      'LDA z$F5', 'CLC', 'ADC #' + entryLen, 'STA z$F5',
+      'LDA z$F6', 'ADC #$00', 'STA z$F6',
+      'JMP CHUNKLOOP',
+
+      'SHOWIMG_DONE:', 'RTS',
+
+      // Copies X pages (256B each) from (FB,FC) to (FD,FE). Pages are copied
+      // back-to-back with no pause; every GROUP_SIZE pages (tracked in z$F0,
+      // which persists across calls within one SHOWIMG) we pause once, so the
+      // reveal happens in big blocky steps instead of a fine per-page sweep.
+      'COPYPAGES:', 'LDY #$00',
+      'CPLOOP:', 'LDA (z$FB),Y', 'STA (z$FD),Y', 'INY', 'BNE CPLOOP',
+      'INC z$FC', 'INC z$FE',
+      'DEC z$F0', 'BNE SKIPDELAY',
+      'LDA #GROUP_SIZE', 'STA z$F0',
+      'JSR DELAY',
+      'SKIPDELAY:',
+      'DEX', 'BNE COPYPAGES', 'RTS',
+
+      // Busy-wait pause; uses A/Y only so it's safe to call from inside
+      // COPYPAGES's page loop without disturbing X (the page counter).
+      'DELAY:', 'LDA #DELAY_OUTER_COUNT',
+      'DELAY_OUTER:', 'LDY #$00',
+      'DELAY_INNER:', 'DEY', 'BNE DELAY_INNER',
+      'SEC', 'SBC #$01', 'BNE DELAY_OUTER', 'RTS',
+
+      'IMGBG:', 'SPACE ' + NUMIMAGES,
+      'IMGCHUNKS:', 'SPACE ' + (2 * NUMIMAGES),
+    );
+
+    const consts = { NUMIMAGES, LASTIDX, DELAY_OUTER_COUNT, GROUP_SIZE, AUTOTARGET };
+    return { lines, consts };
+  }
+
+  function buildProgram(NUMIMAGES, opts) {
+    opts = opts || {};
+    const autoplaySeconds = opts.autoplaySeconds || 0;
+
+    const prologue = [
+      'START:', 'SEI',
+      'LDA #$36', 'STA z$01',        // bank out BASIC ROM ($A000-$BFFF -> RAM)
+      'LDA #$00', 'STA z$F9',
+
+      'LDA $DD00', 'AND #$FC', 'ORA #$02', 'STA $DD00',
+      'LDA #$80', 'STA $D018',
+      'LDA $D011', 'ORA #$20', 'STA $D011',
+      'LDA $D016', 'ORA #$10', 'STA $D016',
+    ];
+    if (autoplaySeconds > 0) prologue.push('LDA #<AUTOTARGET', 'STA z$F1', 'LDA #>AUTOTARGET', 'STA z$F2');
+    prologue.push('JSR SHOWIMG');
+
+    const { lines: driverLines, consts } = buildDriverLines(NUMIMAGES, opts, {
+      chunkBytesPerEntry: 5,
+      bankSelectLines: null,   // no bank switching for PRG - flat addressing
+      exitLines: ['LDA #$37', 'STA z$01', 'JMP $A474'],   // restore BASIC ROM before returning to it
+    });
+
+    const lines = [...prologue, ...driverLines];
+    return assemble(lines, CODE_START, consts);
+  }
+
+  // Fixed BASIC stub "10 SYS2062" (CODE_START=$080E=2062), same for every PRG build.
+  const BASIC_STUB = new Uint8Array([0x0C,0x08, 0x0A,0x00, 0x9E, 0x20,0x32,0x30,0x36,0x32, 0x00, 0x00,0x00]);
+
+  /* =========================================================================
+     PART 3b: CRT/Magic Desk boot bootstrap + relocatable payload
+     ========================================================================= */
+
+  // ---- Magic Desk cartridge memory layout ----
+  // Bank 0 ($8000-$9FFF) holds a tiny, permanently flash-resident bootstrap:
+  // a standard CBM80 autostart header + a fast (no visual-reveal delay) page
+  // copier that relocates the ACTUAL driver - MAINLOOP, SHOWIMG, COPYPAGES,
+  // tables, and every image's chunk-descriptor list - into RAM at $C000 and
+  // jumps there. Everything from that point on runs from RAM, so it can
+  // freely bank-switch ($DE00) to pull image bitmap/screen/color bytes out
+  // of banks 1..63 without ever bank-switching itself out from under its own
+  // executing code (the footgun every banked-cartridge driver sidesteps).
+  //
+  // Only the raw image pixel/screen/color bytes live in flash long-term; the
+  // driver + tables + chunk-lists all get copied to RAM once at boot, because
+  // they're needed WHILE we're bank-switched away reading image banks, and
+  // bank 0's own window would otherwise vanish out from under them.
+  const BOOT_ORG = 0x8000;
+  const RELOC_DEST = 0xC000;   // relocation target - the $C000-$CFFF free RAM pocket
+  const RELOC_CAPACITY = 0x1000; // 4KB - must hold driver + tables + all chunk-lists
+  const BANK_SELECT_REG = 0xDE00;
+  const FIRST_IMAGE_BANK = 1;   // bank 0 is reserved for the bootstrap+payload
+  const TOTAL_BANKS = 64;       // Magic Desk: 64 x 8KB banks = 512KB
+  //
+  // This was EasyFlash (hardware type 32) until real-hardware testing on an
+  // Ultimate 64 proved EasyFlash images don't boot the way this code assumed:
+  // an otherwise byte-identical cartridge booted as hardware type 0 and went
+  // black as type 32. EasyFlash powers up in Ultimax mode and takes its reset
+  // vector from $FFFC out of the cartridge's own upper ROM, so the CBM80
+  // signature at $8000 that this bootstrap relies on is never even looked at.
+  // Magic Desk (hardware type 19) boots as an ordinary 8K game cartridge
+  // through exactly that CBM80 path, banks with a single write of the bank
+  // number to $DE00 - no mode register, no Ultimax, nothing to guess - and
+  // 64 x 8KB = 512KB is the same usable capacity the ROML-only EasyFlash
+  // layout had already been cut down to.
+
+  function buildPayload(NUMIMAGES, opts) {
+    // Cold-start hardware init. The .prg build can skip nearly all of this
+    // because BASIC/KERNAL has already done it before the program ever runs.
+    // A cartridge gets control from the KERNAL's reset routine BEFORE any of
+    // that initialization happens, so anything not set here is whatever the
+    // chips powered up as. Three separate real-hardware symptoms traced back
+    // to assuming otherwise:
+    //   - $D011 was set with a read-modify-write (ORA #$20) that preserved
+    //     the display-enable bit. At cold start that bit is clear, so the
+    //     screen stayed blanked and showed nothing but a flat border color
+    //     no matter how correct the bitmap underneath was.
+    //   - $DD00 (VIC bank select) was written without first setting $DD02,
+    //     CIA2's data-direction register. At cold start it's all inputs, so
+    //     the write did nothing and the VIC kept reading bank 0 while every
+    //     image was being staged into bank 1.
+    //   - $DC02/$DC03 (CIA1 directions) were never set, so driving a
+    //     keyboard column at $DC00 did nothing and every key read back as
+    //     not-pressed. That is the original "boots but keys do nothing".
+    // Everything here is therefore written absolutely, never OR'd into an
+    // unknown power-up value.
+    const prologue = [
+      'START:', 'SEI',
+      'LDA #$2F', 'STA z$00',        // 6510 port direction register
+      'LDA #$37', 'STA z$01',        // BASIC + KERNAL + I/O all mapped in
+      'LDA #$7F', 'STA $DC0D', 'STA $DD0D',  // mask every CIA interrupt source
+      'LDA $DC0D', 'LDA $DD0D',      // read-to-acknowledge anything pending
+      'LDA #$00', 'STA $D01A',       // no VIC raster interrupts
+      'LDA #$FF', 'STA $DC02',       // CIA1 port A -> output (keyboard columns)
+      'LDA #$00', 'STA $DC03',       // CIA1 port B -> input  (keyboard rows)
+      'LDA #$3F', 'STA $DD02',       // CIA2 port A bits 0-1 -> output (VIC bank)
+      'LDA $DD00', 'AND #$FC', 'ORA #$02', 'STA $DD00',  // VIC bank 1: $4000-$7FFF
+      'LDA #$80', 'STA $D018',       // bitmap at $4000, screen at $6000
+      'LDA #$3B', 'STA $D011',       // DEN=1 (un-blank), BMM=1 (bitmap), RSEL=1
+      'LDA #$18', 'STA $D016',       // MCM=1 (multicolor), CSEL=1
+      'LDA #$00', 'STA z$F9',
+    ];
+    const autoplaySeconds = (opts && opts.autoplaySeconds) || 0;
+    if (autoplaySeconds > 0) prologue.push('LDA #<AUTOTARGET', 'STA z$F1', 'LDA #>AUTOTARGET', 'STA z$F2');
+    prologue.push('JSR SHOWIMG');
+
+    const { lines: driverLines, consts } = buildDriverLines(NUMIMAGES, opts || {}, {
+      chunkBytesPerEntry: 6,   // bank, srcLo, srcHi, dstLo, dstHi, pages
+      bankSelectLines: () => ['LDY #$00', 'LDA (z$F5),Y', 'STA $DE00'],
+      // No BASIC to return to from inside a running cartridge (same as any
+      // other C64 cart - you don't "exit" a game back to BASIC either).
+      // RUN/STOP instead does a normal KERNAL reset, which restarts the
+      // viewer from the top (the cartridge is still present/mapped).
+      exitLines: ['JMP $FCE2'],
+    });
+
+    const lines = [...prologue, ...driverLines];
+    return assemble(lines, RELOC_DEST, consts);
+  }
+
+  function buildBootstrap(payloadPages, payloadLabelAddr) {
+    const consts = { RELOC_DEST, PAYLOAD_PAGES: payloadPages };
+    const lines = [
+      // Standard CBM80 8K/16K cartridge autostart convention: KERNAL's reset
+      // routine looks for this exact signature right after two vectors at the
+      // very base of cartridge ROM, and if found, jumps through the first one.
+      'COLDVEC:', 'WORD BOOTSTART',
+      'WARMVEC:', 'WORD BOOTSTART',
+      'BYTES $C3,$C2,$CD,$38,$30',   // "CBM80" signature bytes
+      'BOOTSTART:', 'SEI',
+      // Nothing to configure before copying: a Magic Desk cartridge comes
+      // up as a plain 8K game cart with bank 0 already mapped at
+      // $8000-$9FFF and $C000-$CFFF ordinary RAM, so the copy below can
+      // just run. There is no mode/control register on this cartridge type
+      // at all, which is most of why it was chosen over EasyFlash - the one
+      // register that exists is $DE00, and it takes a bank number.
+      'LDA #<PAYLOAD_SRC', 'STA z$FB',
+      'LDA #>PAYLOAD_SRC', 'STA z$FC',
+      'LDA #<RELOC_DEST', 'STA z$FD',
+      'LDA #>RELOC_DEST', 'STA z$FE',
+      'LDX #PAYLOAD_PAGES',
+      // Fast copy - no visual-reveal delay here, this should feel instant.
+      'BOOTCOPY:', 'LDY #$00',
+      'BOOTCOPY2:', 'LDA (z$FB),Y', 'STA (z$FD),Y', 'INY', 'BNE BOOTCOPY2',
+      'INC z$FC', 'INC z$FE',
+      'DEX', 'BNE BOOTCOPY',
+      'JMP RELOC_DEST',
+      'PAYLOAD_SRC:', 'SPACE ' + (payloadPages * 256),
+    ];
+    return assemble(lines, BOOT_ORG, consts);
+  }
+
+  /* =========================================================================
+     PART 4: PRG capacity planner / byte-range packer / .prg file builder
+     ========================================================================= */
+
+  const LIVE_BITMAP=0x4000, LIVE_SCREEN=0x6000, LIVE_END=0x6400; // color now written straight to $D800, no staging buffer needed
+  const COLOR_RAM=0xD800;
+  const ROM_BASIC_START=0xA000, ROM_BASIC_END=0xC000; // now RAM (banked out) - usable!
+  const FREE_C_START=0xC000, FREE_C_END=0xD000;
+  const IO_START=0xD000, IO_END=0xE000; // excluded entirely
+
+  const SEC_BITMAP_BYTES=8192, SEC_SCREEN_BYTES=1024, SEC_COLOR_BYTES=1024;
+  const CHUNKDATA_BYTES_PER_IMAGE = 35; // typical case: 1-2 pieces/section + marker + sentinel
+
+  function regionsFor(codeEndReserved){
+    return [
+      {start: codeEndReserved, end: LIVE_BITMAP},
+      {start: LIVE_END,        end: ROM_BASIC_START},
+      {start: ROM_BASIC_START, end: ROM_BASIC_END},   // $A000-$BFFF, BASIC ROM banked out
+      {start: FREE_C_START,    end: FREE_C_END},
+    ];
+  }
+
+  function makeAllocator(regions){
+    const free = regions.map(r=>({start:r.start, end:r.end}));
+    return function allocPages(nPages){
+      let need = nPages;
+      const pieces = [];
+      for(const r of free){
+        if(need<=0) break;
+        const availPages = Math.floor((r.end-r.start)/256);
+        if(availPages<=0) continue;
+        const take = Math.min(availPages, need);
+        pieces.push({addr: r.start, pages: take});
+        r.start += take*256;
+        need -= take;
+      }
+      if(need>0) return null;
+      return pieces;
+    };
+  }
+
+  function tryPack(count, codeEndReserved){
+    const alloc = makeAllocator(regionsFor(codeEndReserved));
+    const placements = [];
+    for(let i=0;i<count;i++){
+      const bm = alloc(32); if(!bm) return {ok:false};
+      const sc = alloc(4);  if(!sc) return {ok:false};
+      const co = alloc(4);  if(!co) return {ok:false};
+      for(const p of bm) placements.push({...p, imgIndex:i, section:'bitmap'});
+      for(const p of sc) placements.push({...p, imgIndex:i, section:'screen'});
+      for(const p of co) placements.push({...p, imgIndex:i, section:'color'});
+    }
+    return {ok:true, placements};
+  }
+
+  function estimateCodeEndReserved(n, opts){
+    const probe = buildProgram(Math.max(n,1), opts);
+    const fixedLen = probe.labels.IMGBG - CODE_START;
+    return CODE_START + fixedLen + n + 2*n + n*CHUNKDATA_BYTES_PER_IMAGE;
+  }
+
+  function maxImagesFittable(opts){
+    for(let n=1;n<=64;n++){
+      const r = tryPack(n, estimateCodeEndReserved(n, opts));
+      if(!r.ok) return n-1;
+    }
+    return 64;
+  }
+
+  function buildPrg(images, opts){
+    const N = images.length;
+    if(N<1) throw new Error('no images');
+    const codeEndReserved = estimateCodeEndReserved(N, opts);
+    const pack = tryPack(N, codeEndReserved);
+    if(!pack.ok) throw new Error('too many images for available RAM');
+
+    const prog = buildProgram(N, opts);
+    const codeBytes = prog.bytes.slice();
+
+    const imgBgOff = prog.labels.IMGBG - CODE_START;
+    const imgChunksOff = prog.labels.IMGCHUNKS - CODE_START;
+    for(let i=0;i<N;i++) codeBytes[imgBgOff+i] = images[i].bg & 0x0F;
+
+    const chunkListsAddrByImage = new Array(N);
+    const dataPlacements = [];
+    const chunkListPlacements = [];
+    let chunkDataCursor = CODE_START + (imgChunksOff + 2*N);
+
+    function padded(section, arr){
+      const size = section==='bitmap'?SEC_BITMAP_BYTES:1024;
+      const out = new Uint8Array(size);
+      out.set(arr);
+      return out;
+    }
+
+    const BASIC_STUB = new Uint8Array([0x0C,0x08, 0x0A,0x00, 0x9E, 0x20,0x32,0x30,0x36,0x32, 0x00, 0x00,0x00]);
+
+    for(let i=0;i<N;i++){
+      const secs = {
+        bitmap: padded('bitmap', images[i].bitmap),
+        screen: padded('screen', images[i].screen),
+        color:  padded('color',  images[i].color),
+      };
+      const destBase = {bitmap: LIVE_BITMAP, screen: LIVE_SCREEN, color: COLOR_RAM};
+      const cursorBySection = {bitmap:0, screen:0, color:0};
+      const chunks = [];
+      // order matters: screen+color settle the palette fast, bitmap sweeps in last
+      for(const sectionName of ['screen','color']){
+        const pieces = pack.placements.filter(p=>p.imgIndex===i && p.section===sectionName);
+        for(const piece of pieces){
+          const byteLen = piece.pages*256;
+          const srcBytes = secs[sectionName].slice(cursorBySection[sectionName], cursorBySection[sectionName]+byteLen);
+          dataPlacements.push({addr: piece.addr, bytes: srcBytes});
+          chunks.push({src: piece.addr, dst: destBase[sectionName]+cursorBySection[sectionName], pages: piece.pages});
+          cursorBySection[sectionName] += byteLen;
+        }
+      }
+      chunks.push({marker:true}); // pages=$FF sentinel -> "flush colorsrc to $D800 + set bg"
+      {
+        const pieces = pack.placements.filter(p=>p.imgIndex===i && p.section==='bitmap');
+        for(const piece of pieces){
+          const byteLen = piece.pages*256;
+          const srcBytes = secs.bitmap.slice(cursorBySection.bitmap, cursorBySection.bitmap+byteLen);
+          dataPlacements.push({addr: piece.addr, bytes: srcBytes});
+          chunks.push({src: piece.addr, dst: destBase.bitmap+cursorBySection.bitmap, pages: piece.pages});
+          cursorBySection.bitmap += byteLen;
+        }
+      }
+
+      const listAddr = chunkDataCursor;
+      const listBytes = new Uint8Array(5*(chunks.length+1));
+      let p=0;
+      for(const c of chunks){
+        if(c.marker){
+          listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0xFF;
+        } else {
+          listBytes[p++]=c.src&0xFF; listBytes[p++]=(c.src>>8)&0xFF;
+          listBytes[p++]=c.dst&0xFF; listBytes[p++]=(c.dst>>8)&0xFF;
+          listBytes[p++]=c.pages&0xFF;
+        }
+      }
+      listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0; listBytes[p++]=0; // end sentinel
+      chunkListPlacements.push({addr:listAddr, bytes:listBytes});
+      chunkListsAddrByImage[i]=listAddr;
+      chunkDataCursor += listBytes.length;
+    }
+
+    for(let i=0;i<N;i++){
+      const a = chunkListsAddrByImage[i];
+      codeBytes[imgChunksOff+i*2]=a&0xFF;
+      codeBytes[imgChunksOff+i*2+1]=(a>>8)&0xFF;
+    }
+
+    if (chunkDataCursor > codeEndReserved) {
+      throw new Error('chunk-descriptor data overran its reserved space ($'+chunkDataCursor.toString(16)+' > $'+codeEndReserved.toString(16)+') - increase CHUNKDATA_BYTES_PER_IMAGE');
+    }
+
+    const allPieces = [
+      {addr: CODE_START, bytes: codeBytes},
+      ...chunkListPlacements,
+      ...dataPlacements,
+    ].sort((a,b)=>a.addr-b.addr);
+
+    const out=[];
+    out.push(0x01,0x08);
+    let cursor=0x0801;
+    function advanceTo(addr){ while(cursor<addr){ out.push(0); cursor++; } }
+    function appendBytes(bytes){ for(let i=0;i<bytes.length;i++) out.push(bytes[i]); cursor+=bytes.length; }
+    advanceTo(0x0801);
+    appendBytes(BASIC_STUB);
+    for(const piece of allPieces){ advanceTo(piece.addr); appendBytes(piece.bytes); }
+    return new Uint8Array(out);
+  }
+
+  /* =========================================================================
+     PART 4b: CRT/Magic Desk capacity planner / bank allocator / .crt file builder
+     ========================================================================= */
+
+  // SEC_BITMAP_BYTES/SEC_SCREEN_BYTES/SEC_COLOR_BYTES/LIVE_BITMAP/LIVE_SCREEN/COLOR_RAM
+  // reused from the PRG section above (PART 4) - identical values, same live buffer.
+  // A Magic Desk bank IS 8KB (32 pages), mapped at $8000-$9FFF while
+  // selected. There is no second window and no mode register: one write of
+  // the bank number to $DE00 and the whole 8KB swaps. Formerly EasyFlash
+  // without extra hardware-mode setup - which is why the driver
+  // deliberately stays within that one proven-working window.
+  const BANK_PAGES = 32; // 8KB/bank, mapped at $8000-$9FFF (ROML) while selected
+  const CHUNK_ENTRY_BYTES = 6; // bank, srcLo, srcHi, dstLo, dstHi, pages
+  // Per-image RAM overhead in the relocated payload: 1 byte in IMGBG + 2 bytes
+  // in IMGCHUNKS + a chunk-descriptor list (screen + color pieces + 1 marker +
+  // bitmap pieces + 1 end-of-list sentinel, each CHUNK_ENTRY_BYTES bytes).
+  // Sized generously for the case a section gets split across a bank boundary.
+  const PAYLOAD_BYTES_PER_IMAGE = 60;
+
+  function makeBankAllocator(startBank, numBanks) {
+    const free = [];
+    for (let b = startBank; b < startBank + numBanks; b++) free.push({ bank: b, addr: 0x8000, pagesLeft: BANK_PAGES });
+    return function allocPages(nPages) {
+      let need = nPages;
+      const pieces = [];
+      for (const r of free) {
+        if (need <= 0) break;
+        if (r.pagesLeft <= 0) continue;
+        const take = Math.min(r.pagesLeft, need);
+        pieces.push({ bank: r.bank, addr: r.addr, pages: take });
+        r.addr += take * 256;
+        r.pagesLeft -= take;
+        need -= take;
+      }
+      if (need > 0) return null;
+      return pieces;
+    };
+  }
+
+  function tryPackCrt(count, numBanksAvailable) {
+    const alloc = makeBankAllocator(FIRST_IMAGE_BANK, numBanksAvailable);
+    const placements = [];
+    for (let i = 0; i < count; i++) {
+      const bm = alloc(32); if (!bm) return { ok: false };
+      const sc = alloc(4); if (!sc) return { ok: false };
+      const co = alloc(4); if (!co) return { ok: false };
+      for (const p of bm) placements.push({ ...p, imgIndex: i, section: 'bitmap' });
+      for (const p of sc) placements.push({ ...p, imgIndex: i, section: 'screen' });
+      for (const p of co) placements.push({ ...p, imgIndex: i, section: 'color' });
+    }
+    return { ok: true, placements };
+  }
+
+  function payloadFitsRam(n, opts) {
+    const probe = buildPayload(Math.max(n, 1), opts);
+    const imgBgOff = probe.labels.IMGBG - RELOC_DEST;
+    // exact bytes for driver+tables at this N; chunk-lists are appended after
+    // IMGCHUNKS, sized generously via PAYLOAD_BYTES_PER_IMAGE per image.
+    const total = imgBgOff + n + 2 * n + n * PAYLOAD_BYTES_PER_IMAGE;
+    return total <= RELOC_CAPACITY;
+  }
+
+  function maxImagesFittableCrt(opts, numBanksAvailable) {
+    numBanksAvailable = numBanksAvailable || (TOTAL_BANKS - FIRST_IMAGE_BANK);
+    for (let n = 1; n <= 200; n++) {
+      if (!payloadFitsRam(n, opts)) return n - 1;
+      if (!tryPackCrt(n, numBanksAvailable).ok) return n - 1;
+    }
+    return 200;
+  }
+
+  // .crt (cartridge image) file format, hand-encoded below.
+  const CRT_SIGNATURE = 'C64 CARTRIDGE   '; // exactly 16 bytes ("C64 CARTRIDGE" + 3 spaces) -
+  // the real firmware strncmp()s all 16 bytes including the padding, so this has to be
+  // space-padded to the full width, not just long enough for asciiBytes() to truncate.
+  const CRT_HEADER_LEN = 0x40;
+  // Hardware type 19 = Magic Desk. This was 32 (EasyFlash) until real-
+  // hardware testing on an Ultimate 64 showed that an otherwise byte-
+  // identical cartridge boots as type 0 and goes black as type 32 -
+  // EasyFlash images boot through their own reset vector in Ultimax mode,
+  // not through the CBM80 signature this bootstrap uses.
+  const MAGIC_DESK_HW_TYPE = 19;
+
+  function u16be(v) { return [(v >> 8) & 0xFF, v & 0xFF]; }
+  function u32be(v) { return [(v >>> 24) & 0xFF, (v >>> 16) & 0xFF, (v >>> 8) & 0xFF, v & 0xFF]; }
+  function asciiBytes(s, len) {
+    const out = new Array(len).fill(0);
+    for (let i = 0; i < Math.min(s.length, len); i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  function buildCrtHeader(name) {
+    const out = [];
+    out.push(...asciiBytes(CRT_SIGNATURE, 16));
+    out.push(...u32be(CRT_HEADER_LEN));
+    out.push(...u16be(0x0100));            // version 1.0
+    out.push(...u16be(MAGIC_DESK_HW_TYPE));
+    // EXROM/GAME header lines: (0, 1) - raw C64 expansion-port pin values,
+    // active-low (0 = line driven low = active, matching a real cartridge
+    // ROM physically present; 1 = inactive/high). This is "8K game" mode:
+    // $8000-$9FFF mapped to cartridge ROM, everything else normal RAM,
+    // KERNAL still present - which is what makes both the CBM80 autostart
+    // scan and the $C000 relocation target work. A previous version had
+    // these inverted (1, 0), which is actually raw Ultimax mode (EXROM
+    // high, GAME low) - that remaps cartridge ROM over the KERNAL at
+    // $E000-$FFFF and disables most RAM, including $C000-$CFFF, which is
+    // exactly where the relocated driver needs to run. Confirmed against a
+    // real, known-working cartridge file a user provided directly.
+    out.push(0);                            // EXROM line
+    out.push(1);                            // GAME line
+    out.push(...new Array(6).fill(0));      // reserved
+    out.push(...asciiBytes(name || 'C64 IMAGE TOOLKIT', 32));
+    return out;
+  }
+
+  function chipPacket(bank, loadAddr, data) {
+    const out = [];
+    out.push(...asciiBytes('CHIP', 4));
+    out.push(...u32be(16 + data.length));
+    out.push(...u16be(0));            // chip type: 0 = ROM, as the known-working cart
+    out.push(...u16be(bank));
+    out.push(...u16be(loadAddr));
+    out.push(...u16be(data.length));
+    for (let i = 0; i < data.length; i++) out.push(data[i]);
+    return out;
+  }
+
+  function buildCrt(images, opts) {
+    const N = images.length;
+    if (N < 1) throw new Error('no images');
+
+    const payload = buildPayload(N, opts);
+    if (payload.bytes.length + N * PAYLOAD_BYTES_PER_IMAGE + 3 * N > RELOC_CAPACITY) {
+      // (rough guard; the authoritative check is payloadFitsRam via maxImagesFittableCrt)
+    }
+    const codeBytes = payload.bytes.slice();
+    const imgBgOff = payload.labels.IMGBG - RELOC_DEST;
+    const imgChunksOff = payload.labels.IMGCHUNKS - RELOC_DEST;
+    for (let i = 0; i < N; i++) codeBytes[imgBgOff + i] = images[i].bg & 0x0F;
+
+    const numBanksAvailable = TOTAL_BANKS - FIRST_IMAGE_BANK;
+    const pack = tryPackCrt(N, numBanksAvailable);
+    if (!pack.ok) throw new Error('too many images for available flash banks');
+
+    // Chunk-descriptor lists are appended right after IMGCHUNKS in the SAME
+    // relocated RAM payload (they must live in RAM too - see prog_crt.js).
+    let chunkDataCursor = payload.labels.IMGCHUNKS + 2 * N; // RAM address ($C0xx)
+    const chunkListsAddrByImage = new Array(N);
+    const chunkListBytesByImage = new Array(N);
+    const bankData = new Map(); // bank -> Uint8Array(0x2000), lazily created
+
+    function bankBuf(bank) {
+      if (!bankData.has(bank)) bankData.set(bank, new Uint8Array(0x2000));
+      return bankData.get(bank);
+    }
+    function padded(section, arr) {
+      const size = section === 'bitmap' ? SEC_BITMAP_BYTES : 1024;
+      const out = new Uint8Array(size);
+      out.set(arr);
+      return out;
+    }
+
+    for (let i = 0; i < N; i++) {
+      const secs = {
+        bitmap: padded('bitmap', images[i].bitmap),
+        screen: padded('screen', images[i].screen),
+        color: padded('color', images[i].color),
+      };
+      const destBase = { bitmap: LIVE_BITMAP, screen: LIVE_SCREEN, color: COLOR_RAM };
+      const cursorBySection = { bitmap: 0, screen: 0, color: 0 };
+      const chunks = [];
+      for (const sectionName of ['screen', 'color']) {
+        const pieces = pack.placements.filter(p => p.imgIndex === i && p.section === sectionName);
+        for (const piece of pieces) {
+          const byteLen = piece.pages * 256;
+          const srcBytes = secs[sectionName].slice(cursorBySection[sectionName], cursorBySection[sectionName] + byteLen);
+          bankBuf(piece.bank).set(srcBytes, piece.addr - 0x8000);
+          chunks.push({ bank: piece.bank, src: piece.addr, dst: destBase[sectionName] + cursorBySection[sectionName], pages: piece.pages });
+          cursorBySection[sectionName] += byteLen;
+        }
+      }
+      chunks.push({ marker: true });
+      {
+        const pieces = pack.placements.filter(p => p.imgIndex === i && p.section === 'bitmap');
+        for (const piece of pieces) {
+          const byteLen = piece.pages * 256;
+          const srcBytes = secs.bitmap.slice(cursorBySection.bitmap, cursorBySection.bitmap + byteLen);
+          bankBuf(piece.bank).set(srcBytes, piece.addr - 0x8000);
+          chunks.push({ bank: piece.bank, src: piece.addr, dst: destBase.bitmap + cursorBySection.bitmap, pages: piece.pages });
+          cursorBySection.bitmap += byteLen;
+        }
+      }
+
+      const listAddr = chunkDataCursor;
+      const listBytes = new Uint8Array(CHUNK_ENTRY_BYTES * (chunks.length + 1));
+      let p = 0;
+      for (const c of chunks) {
+        if (c.marker) {
+          listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0xFF;
+        } else {
+          listBytes[p++] = c.bank & 0xFF;
+          listBytes[p++] = c.src & 0xFF; listBytes[p++] = (c.src >> 8) & 0xFF;
+          listBytes[p++] = c.dst & 0xFF; listBytes[p++] = (c.dst >> 8) & 0xFF;
+          listBytes[p++] = c.pages & 0xFF;
+        }
+      }
+      listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; listBytes[p++] = 0; // end sentinel
+      chunkListsAddrByImage[i] = listAddr;
+      chunkListBytesByImage[i] = listBytes;
+      chunkDataCursor += listBytes.length;
+    }
+
+    if (chunkDataCursor - RELOC_DEST > RELOC_CAPACITY) {
+      throw new Error('relocated payload (driver + tables + chunk-lists) overran the $C000-$CFFF RAM pocket ($' + (chunkDataCursor - RELOC_DEST).toString(16) + ' > $1000) - increase PAYLOAD_BYTES_PER_IMAGE or reduce image count');
+    }
+
+    for (let i = 0; i < N; i++) {
+      const a = chunkListsAddrByImage[i];
+      codeBytes[imgChunksOff + i * 2] = a & 0xFF;
+      codeBytes[imgChunksOff + i * 2 + 1] = (a >> 8) & 0xFF;
+    }
+
+    // codeBytes currently only covers driver+tables (through IMGCHUNKS); grow
+    // it to also hold the chunk-lists that follow, all still targeting RAM
+    // addresses starting at RELOC_DEST.
+    const fullPayloadLen = chunkDataCursor - RELOC_DEST;
+    const fullPayload = new Uint8Array(fullPayloadLen);
+    fullPayload.set(codeBytes, 0);
+    let cursor = codeBytes.length;
+    for (let i = 0; i < N; i++) {
+      fullPayload.set(chunkListBytesByImage[i], (chunkListsAddrByImage[i] - RELOC_DEST));
+      cursor = Math.max(cursor, (chunkListsAddrByImage[i] - RELOC_DEST) + chunkListBytesByImage[i].length);
+    }
+
+    const payloadPages = Math.ceil(fullPayload.length / 256);
+    const boot = buildBootstrap(payloadPages, payload.labels.START);
+    const payloadSrcOff = boot.labels.PAYLOAD_SRC - BOOT_ORG;
+
+    // Assemble bank 0: bootstrap code + the relocatable payload, both living
+    // in flash at $8000-$9FFF while bank 0 is selected (which it is at
+    // reset, before anything has written to $DE00).
+    const bank0 = new Uint8Array(0x2000);
+    bank0.set(boot.bytes, 0);
+    bank0.set(fullPayload, payloadSrcOff);
+    bankData.set(0, bank0);
+
+    // ---- emit the .crt file ----
+    const out = [];
+    out.push(...buildCrtHeader());
+    const banks = Array.from(bankData.keys()).sort((a, b) => a - b);
+    for (const bank of banks) {
+      const buf = bankData.get(bank);
+      out.push(...chipPacket(bank, 0x8000, buf));
+    }
+    return { bytes: new Uint8Array(out), bankCount: banks.length };
+  }
+
+
+  /* =========================================================================
+     PART 6: UI
+     ========================================================================= */
+
+  const dropzone=document.getElementById('dropzone');
+  const fileInput=document.getElementById('fileInput');
+  const imgList=document.getElementById('imgList');
+  const prevCanvas=document.getElementById('prevCanvas');
+  const statLine=document.getElementById('statLine');
+  const buildStat=document.getElementById('buildStat');
+  const downloadBtn=document.getElementById('downloadBtn');
+  const fitMode=document.getElementById('fitMode');
+  const ditherSel=document.getElementById('ditherSel');
+
+  const capStat=document.getElementById('capStat');
+  const capFill=document.getElementById('capFill');
+  const capWarn=document.getElementById('capWarn');
+  const fmtPrg=document.getElementById('fmtPrg');
+  const fmtCrt=document.getElementById('fmtCrt');
+  const autoplaySecs=document.getElementById('autoplaySecs');
+  const usageStat=document.getElementById('usageStat');
+
+  // images: [{name, htmlImg, result}]
+  const images = [];
+  let selectedIdx = -1;
+
+  function currentFormat(){ return fmtCrt.checked ? 'crt' : 'prg'; }
+  function currentOpts(){
+    const secs = Math.max(0, Math.min(300, parseInt(autoplaySecs.value,10)||0));
+    return { autoplaySeconds: secs };
+  }
+  function currentMaxImages(){
+    const opts = currentOpts();
+    return currentFormat()==='crt' ? maxImagesFittableCrt(opts) : maxImagesFittable(opts);
+  }
+  function updateUsageText(){
+    usageStat.innerHTML = currentFormat()==='crt'
+      ? `Mount/insert the .crt &mdash; it starts on its own (no <code>LOAD</code>/<code>RUN</code>). Use <b>&larr;/&rarr;</b> (the cursor key, shifted = left) or <b>A</b>/<b>D</b> to flip pictures, <b>RUN/STOP</b> restarts the viewer.`
+      : `<code>LOAD"filename",8,1</code> then <code>RUN</code>. Use <b>&larr;/&rarr;</b> (the cursor key, shifted = left) or <b>A</b>/<b>D</b> to flip pictures, <b>RUN/STOP</b> to exit.`;
+    downloadBtn.textContent = 'Build & Download .' + currentFormat();
+  }
+  [fmtPrg,fmtCrt].forEach(el=>el.addEventListener('change',()=>{ updateUsageText(); updateCapacity(); }));
+  autoplaySecs.addEventListener('input',updateCapacity);
+  updateUsageText();
+
+  ['dragenter','dragover'].forEach(ev=>dropzone.addEventListener(ev,e=>{ e.preventDefault(); dropzone.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev=>dropzone.addEventListener(ev,e=>{ e.preventDefault(); dropzone.classList.remove('drag'); }));
+  dropzone.addEventListener('drop',e=>{ const files=[...(e.dataTransfer.files||[])]; if(files.length) addFiles(files); });
+  dropzone.addEventListener('click',()=>fileInput.click());
+  fileInput.addEventListener('change',()=>{ if(fileInput.files.length) addFiles([...fileInput.files]); fileInput.value=''; });
+
+  [fitMode,ditherSel].forEach(el=>el.addEventListener('change',()=>{
+    images.forEach((_,i)=>reconvert(i));
+    refreshList();
+    if(selectedIdx>=0) selectImage(selectedIdx);
+    updateCapacity();
+  }));
+  function addFiles(files){
+    let pending = files.length;
+    files.forEach(file=>{
+      const url=URL.createObjectURL(file);
+      const img=new Image();
+      img.onload=()=>{
+        URL.revokeObjectURL(url);
+        images.push({ name:(file.name||'image').replace(/\.[^.]+$/,''), htmlImg:img, result:null });
+        reconvert(images.length-1);
+        if(--pending===0){ refreshList(); selectImage(images.length-1); updateCapacity(); }
+        else { refreshList(); updateCapacity(); }
+      };
+      img.onerror=()=>{ if(--pending===0){ refreshList(); updateCapacity(); } };
+      img.src=url;
+    });
+  }
+
+  function reconvert(i){
+    const it = images[i];
+    const opts = { fitMode: fitMode.value, ditherStrength: +ditherSel.value };
+    it.result = convertOne(it.htmlImg, opts);
+  }
+
+  function refreshList(){
+    imgList.innerHTML='';
+    images.forEach((it,i)=>{
+      const li=document.createElement('li');
+      li.className = i===selectedIdx ? 'active':'';
+      const cv=document.createElement('canvas');
+      it.result.renderTo(cv);
+      const meta=document.createElement('div'); meta.className='meta';
+      meta.innerHTML = `<div class="name">${escapeHtml(it.name)}</div><div class="idx">#${i} &middot; bg ${it.result.bg}</div>`;
+      const btns=document.createElement('div'); btns.className='btns';
+      const up=mkBtn('&uarr;', ()=>{ if(i>0){ swap(i,i-1); } });
+      const down=mkBtn('&darr;', ()=>{ if(i<images.length-1){ swap(i,i+1); } });
+      const rm=mkBtn('&times;', ()=>{ removeImage(i); }, true);
+      btns.append(up,down,rm);
+      li.append(cv,meta,btns);
+      li.addEventListener('click',(e)=>{ if(e.target.tagName!=='BUTTON') selectImage(i); });
+      imgList.appendChild(li);
+    });
+  }
+  function mkBtn(html,fn,danger){
+    const b=document.createElement('button');
+    b.className='tiny'+(danger?' danger':' secondary');
+    b.innerHTML=html;
+    b.addEventListener('click',(e)=>{ e.stopPropagation(); fn(); });
+    return b;
+  }
+  function swap(i,j){
+    const t=images[i]; images[i]=images[j]; images[j]=t;
+    if(selectedIdx===i) selectedIdx=j; else if(selectedIdx===j) selectedIdx=i;
+    refreshList(); selectImage(selectedIdx); updateCapacity();
+  }
+  function removeImage(i){
+    images.splice(i,1);
+    if(selectedIdx===i) selectedIdx=-1;
+    else if(selectedIdx>i) selectedIdx--;
+    refreshList();
+    if(images.length===0){ statLine.textContent='No image selected.'; prevCanvas.getContext('2d').clearRect(0,0,320,200); downloadBtn.disabled=true; }
+    else selectImage(Math.max(0,Math.min(selectedIdx,images.length-1)));
+    updateCapacity();
+  }
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function selectImage(i){
+    selectedIdx=i;
+    [...imgList.children].forEach((li,idx)=>li.classList.toggle('active', idx===i));
+    if(i<0 || !images[i]) return;
+    const it=images[i];
+    it.result.renderTo(prevCanvas);
+    statLine.innerHTML = `<b>${escapeHtml(it.name)}</b> (#${i}) &middot; dithering <b>${(+ditherSel.value)>0 ? ditherSel.options[ditherSel.selectedIndex].text.split(' ')[0].toLowerCase() : 'off'}</b>`;
+  }
+
+  function updateCapacity(){
+    if(images.length===0){
+      capStat.textContent='Add some images to get started.';
+      capFill.style.width='0%'; capWarn.innerHTML=''; downloadBtn.disabled=true;
+      return;
+    }
+    const maxN = currentMaxImages();
+    const n = images.length;
+    const pct = Math.min(100, Math.round(100*n/Math.max(maxN,1)));
+    capFill.style.width=pct+'%';
+    capFill.style.background = n<=maxN ? '' : 'var(--bad)';
+    const fmtLabel = currentFormat()==='crt' ? '.crt' : '.prg';
+    capStat.innerHTML = `<b>${n}</b> image${n===1?'':'s'} added &middot; up to <b>${maxN}</b> fit as ${fmtLabel} with the current settings.`;
+    if(n>maxN){
+      capWarn.innerHTML = `<div class="warnbox">Too many images for available space (${n} added, ${maxN} fit). Remove ${n-maxN} image${n-maxN===1?'':'s'}, lower the auto-advance time, or switch format before building.</div>`;
+      downloadBtn.disabled=true;
+    } else {
+      capWarn.innerHTML='';
+      downloadBtn.disabled=false;
+    }
+  }
+
+  downloadBtn.addEventListener('click',()=>{
+    try{
+      const fmt = currentFormat();
+      const opts = currentOpts();
+      const imgArgs = images.map(it=>({bitmap:it.result.bitmap, screen:it.result.screen, color:it.result.color, bg:it.result.bg}));
+      const baseName = (images.length===1?images[0].name:'slideshow');
+      let bytes, label;
+      if (fmt==='crt') {
+        const built = buildCrt(imgArgs, opts);
+        bytes = built.bytes;
+        label = `Built <b>${bytes.length}</b> byte .crt (${built.bankCount} flash bank${built.bankCount===1?'':'s'}) with <b>${images.length}</b> image${images.length===1?'':'s'}.`;
+      } else {
+        bytes = buildPrg(imgArgs, opts);
+        label = `Built <b>${bytes.length}</b> byte .prg with <b>${images.length}</b> image${images.length===1?'':'s'}.`;
+      }
+      const blob=new Blob([bytes],{type:'application/octet-stream'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url; a.download=baseName+'.'+fmt;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+      buildStat.innerHTML = label;
+    } catch(err){
+      buildStat.innerHTML = `<span style="color:var(--bad)">Build failed: ${escapeHtml(String(err.message||err))}</span>`;
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
