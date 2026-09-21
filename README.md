@@ -16,7 +16,9 @@ work anyway.
 
 ## Using it
 
-Open `cameradore64.html` in a browser. Drag your photos in, choose `.prg` or
+Here in your browser: (https://jknivesworthy.github.io/cameradore64/cameradore64.html) No install and nothing uploaded.
+
+Locally: Download and Open `cameradore64.html` in a browser. Drag your photos in, choose `.prg` or
 `.crt`, download.
 
 Then on the C64:
@@ -33,7 +35,7 @@ Flip through pictures with `A` and `D`, or the cursor keys with shift to go
 backwards. `RUN/STOP` gets you out. There is an autoplay timer too, if you
 want to leave it running as a screensaver.
 
-Tested on real hardware, not just in an emulator.
+Tested on real hardware.
 
 ## Landscapes are what it's best at
 
