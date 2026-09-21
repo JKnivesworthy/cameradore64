@@ -35,24 +35,23 @@ want to leave it running as a screensaver.
 
 Tested on real hardware, not just in an emulator.
 
-## Landscapes are what it is good at
+## Landscapes are what it's best at
 
 Wide outdoor shots come out looking like the painted backdrops from an old
-Sierra adventure game. That is not a filter I added, it falls out of the
-hardware.
+Sierra adventure game. 
 
-The C64 carves the screen into 4x8 blocks and gives each block three colours
+The C64 carves the screen into 4x8 blocks and gives each block three colors
 plus one shared background. Big coherent shapes survive that. Fine detail does
 not. A landscape is mostly big coherent shapes: sky, treeline, water, the line
 of a ridge. Skies do particularly well, because a smooth gradient is exactly
-what dithering between two well chosen colours is good at.
+what dithering between two well chosen colors is best at.
 
-Sierra's artists were solving the same problem on 16 colour EGA, which is why
-the results rhyme.
+Sierra's artists were solving the same problem on 16 color EGA, which is why
+the results match.
 
 Portraits work, but they are the hard case. Faces sit in a narrow band of
 similar tones where small shifts read as wrong, and the detail that makes
-someone recognisable is smaller than one block.
+someone recognizable is smaller than one block.
 
 ## How many pictures fit
 
@@ -64,7 +63,7 @@ KERNAL, which is not much.
 
 ## Options
 
-**Dithering** trades exact colour for apparent detail. Full is the default and
+**Dithering** trades exact color for apparent detail. Full is the default and
 is usually what you want. Turn it down or off for graphic, poster-like images
 with large flat areas, where the texture just reads as noise.
 
@@ -94,9 +93,9 @@ Multicolor bitmap mode, 160x200, VIC bank 1. Both output formats share one
 slideshow driver written in 6502 assembly, assembled by a small assembler that
 lives in the same HTML file.
 
-Choosing colours is the whole game. Each 4x8 block gets three of the sixteen
+Choosing colors is the whole game. Each 4x8 block gets three of the sixteen
 available, so the converter tries every possible combination for every block
-and keeps whichever reproduces that block most closely, comparing colours in
+and keeps whichever reproduces that block most closely, comparing colors in
 CIE Lab so the choices match what the eye actually sees rather than what looks
 close arithmetically.
 
